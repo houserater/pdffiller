@@ -48,14 +48,16 @@
             return jsonObj;
         },
 
-        generateFieldJson: function( sourceFile, nameRegex, callback){
-            var regName = /FieldName: ([^\n]*)/,
+        generateFieldJson: function( sourceFile, regexMatchers, callback){
+            var {
+                regName = /FieldName: ([^\n]*)/,
+                regValue = /FieldValue: ([^\n]*)/,
                 regType = /FieldType: ([A-Za-z\t .]+)/,
                 regFlags = /FieldFlags: ([0-9\t .]+)/,
-                fieldArray = [],
-                currField = {};
+            } = regexMatchers || {};
 
-            if(nameRegex !== null && (typeof nameRegex) == 'object' ) regName = nameRegex;
+            var fieldArray = [],
+                currField = {};
 
             execFile( "pdftk", [sourceFile, "dump_data_fields_utf8"], function (error, stdout, stderr) {
                 if (error) {
@@ -64,24 +66,28 @@
                 }
 
                 fields = stdout.toString().split("---").slice(1);
-                fields.forEach(function(field){
+                fields.forEach(function(field) {
                     currField = {};
 
                     currField['title'] = field.match(regName)[1].trim() || '';
 
-                    if(field.match(regType)){
+                    if (field.match(regValue)) {
+                        currField['fieldValue'] = _.get(field.match(regValue), '1', '').trim()
+                    } else {
+                        currField['fieldValue'] = '';
+                    }
+
+                    if (field.match(regType)) {
                         currField['fieldType'] = field.match(regType)[1].trim() || '';
-                    }else {
+                    } else {
                         currField['fieldType'] = '';
                     }
 
-                    if(field.match(regFlags)){
-                        currField['fieldFlags'] = field.match(regFlags)[1].trim()|| '';
-                    }else{
+                    if (field.match(regFlags)) {
+                        currField['fieldFlags'] = field.match(regFlags)[1].trim() || '';
+                    } else {
                         currField['fieldFlags'] = '';
                     }
-
-                    currField['fieldValue'] = '';
 
                     fieldArray.push(currField);
                 });
@@ -90,8 +96,8 @@
             });
         },
 
-        generateFDFTemplate: function( sourceFile, nameRegex, callback ){
-            this.generateFieldJson(sourceFile, nameRegex, function(err, _form_fields){
+        generateFDFTemplate: function( sourceFile, regexMatchers, callback ){
+            this.generateFieldJson(sourceFile, regexMatchers, function(err, _form_fields){
                 if (err) {
                   console.log('exec error: ' + err);
                   return callback(err, null);
